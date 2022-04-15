@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Title</title>
+  </head>
+  <body>
+    <script>
+      let watcherId = 0;
+      let depId = 0;
+
+      class Dep {
+        constructor() {
+          this.id = depId++;
+          this.subs = []; //存储watcher
+        }
+
+        addSub(sub) {
+          this.subs.push(sub);
+        }
+
+        removeSub(sub) {
+          for (let i = this.subs.length; i >= 0; i--) {
+            if (sub === this.subs[i]) {
+              this.subs.slice(i, 1);
+            }
+          }
+        }
+
+        // 收集依赖
+        depend() {
+          if (Dep.target) {
+            // watcher与dep互相关联
+            this.addSub(Dep.target);
+            Dep.target.addDep(this);
+          }
+        }
+
+        // 触发依赖
+        notify() {
+          // 把存在这个dep里的watcher获取到
+          let deps = this.subs.slice();
+          deps.forEach((watcher) => {
+            watcher.update();
+          });
+        }
+      }
+
+      // 全局watcher
+      Dep.target = null;
+      let targetStack = [];
+
+      function pushTask(target) {
+        targetStack.unshift(Dep.target);
+        Dep.target = target;
+      }
+
+      function popTarget() {
+        Dep.target = targetStack.shift();
+      }
+
+      class Watcher {
+        constructor(vm, expOrfn) {
+          this.vm = vm;
+          this.getter = expOrfn; // 执行更新视图的函数
+          this.deps = [];
+          this.id = watcherId++;
+          this.get();
+        }
+
+        get() {
+          pushTask(this);
+          this.getter.call(this.vm, this.vm);
+          popTarget();
+        }
+
+        update() {
+          this.get();
+        }
+
+        addDep(dep) {
+          this.deps.push(dep);
+        }
+      }
+
+      let ARRAY_METHOD = [
+        "push",
+        "pop",
+        "shift",
+        "unshift",
+        "reverse",
+        "sort",
+        "splice",
+      ];
+
+      let array_methods = Object.create(Array.prototype);
+      ARRAY_METHOD.forEach((method) => {
+        array_methods[method] = function () {
+          console.log("数组拦截");
+          for (let i = 0; i < arguments.length; i++) {
+            observe(arguments[i]);
+          }
+
+          let res = Array.prototype[method].apply(this, arguments);
+          return res;
+        };
+      });
+
+      function defineReactive(data, key, val) {
+        // 解决多层签到问题
+        if (typeof val === "object" && val != null) {
+          observe(val);
+        }
+        let dep = new Dep();
+        dep.__propName__ = key;
+
+        Object.defineProperty(data, key, {
+          get() {
+            console.log(`${data}的${key}属性获取`);
+            dep.depend();
+            return val;
+          },
+          set(newVal) {
+            if (newVal != val) return;
+            if (typeof newVal === "object" && newVal != null) {
+              observe(newVal);
+            }
+            console.log(`${data}的${key}属性改动`);
+            val = newVal;
+            dep.notify();
+          },
+        });
+      }
+
+      function observe(obj) {
+        if (typeof obj !== "object" || obj === null) {
+          // 不是数组或对象不适合监听
+          return;
+        }
+        if (Array.isArray(obj)) {
+          obj.__proto__ = array_methods;
+          for (let i = 0; i < obj.length; i++) {
+            observe(obj[i]);
+          }
+        } else {
+          let keys = Object.keys(obj);
+          console.log(keys);
+          for (let i = 0; i < keys.length; i++) {
+            let prop = keys[i];
+            defineReactive(obj, prop, obj[prop]);
+          }
+        }
+      }
+
+      let data = {
+        name: "wjy",
+        id: 999,
+        info: {
+          tel: "4324",
+          email: "fawf",
+        },
+        course: [1, { name: "fdaf" }, "fsfda"],
+      };
+
+      observe(data);
+    </script>
+  </body>
+</html>

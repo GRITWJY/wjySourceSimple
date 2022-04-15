@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Title</title>
+  </head>
+  <body>
+    <script>
+      let tags = "div,p,a,img,ul,li".split(",");
+      function makeMap(keys) {
+        let set = {};
+        tags.forEach((key) => (set[key] = true));
+        return function (tagName) {
+          return !!set[tagName.toLowerCase()];
+        };
+      }
+
+      let isHTMLTag = makeMap(tags); // 返回的函数
+    </script>
+  </body>
+</html>

@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Title</title>
+  </head>
+  <body>
+    <script>
+      let data = {
+        name: "张三",
+        age: 19,
+        course: [{ name: "fadsf" }, { name: "134" }, { name: "faqfaf" }],
+      }; //todo: 除了递归还可以使用队列(深度优先转换为广度优先)
+
+      function defineReactive(data, key, val, enumerable) {
+        if (typeof val === "object" && val != null && !Array.isArray(val)) {
+          reactify(val);
+        }
+
+        Object.defineProperty(data, key, {
+          configurable: true,
+          enumerable: !!enumerable,
+          get() {
+            console.log(`读取${key}的属性`);
+            return val;
+          },
+          set(newValue) {
+            if (newValue === val) {
+              return;
+            }
+            console.log(`设置{key}的属性为${newValue}`);
+            val = newValue;
+          },
+        });
+      }
+
+      // 将对象o响应式化
+      function reactify(o) {
+        let keys = Object.keys(o);
+        for (let i = 0; i < keys.length; i++) {
+          let key = keys[i]; // 属性名
+          let value = o[key];
+
+          // 判断这个属性是不是引用类型，是不是数组类型
+          // 如果是引用类型，就需要递归
+          // 如果是数组，就需要循环数组，将数组里面的元素进行响应式化
+          if (Array.isArray(value)) {
+            // 数组
+            for (let j = 0; j < value.length; j++) {
+              reactify(value[j]); // 递归
+            }
+          } else {
+            // 对象或值类型
+            defineReactive(o, key, value, true);
+          }
+        }
+      }
+
+      reactify(data);
+    </script>
+  </body>
+</html>

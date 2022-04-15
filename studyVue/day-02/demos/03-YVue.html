@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Title</title>
+  </head>
+  <body>
+    <div id="root">
+      <div class="c1">
+        <div class="c2">{{name}}</div>
+        <div>{{firstname}}</div>
+        <div>hello3</div>
+        <ul>
+          <li>1</li>
+          <li>2</li>
+          <li>3</li>
+        </ul>
+      </div>
+    </div>
+
+    <script>
+      class VNode {
+        constructor(tag, data, value, type) {
+          this.tag = tag && tag.toLowerCase();
+          this.data = data;
+          this.value = value;
+          this.type = type;
+          this.children = [];
+        }
+
+        appendChild(vnode) {
+          this.children.push(vnode);
+        }
+      }
+
+      /*
+       * 由 HTMML DOM _> VNode：  当做compiler函数
+       * */
+      function getVNode(node) {
+        let nodeType = node.nodeType;
+        let _vnode = null;
+        if (nodeType === 1) {
+          // 元素
+          let nodeName = node.nodeName;
+          let attrs = node.attributes;
+          let _attrObj = {};
+          for (let i = 0; i < attrs.length; i++) {
+            // attrs[i] 属性节点（nodeType == 2）
+            _attrObj[attrs[i].nodeName] = attrs[i].nodeValue;
+          }
+          _vnode = new VNode(nodeName, _attrObj, undefined, nodeType);
+
+          // 考虑node 的 子元素
+          let childNodes = node.childNodes;
+          for (let i = 0; i < childNodes.length; i++) {
+            _vnode.appendChild(getVNode(childNodes[i])); // 递归
+          }
+        } else if (nodeType === 3) {
+          _vnode = new VNode(undefined, undefined, node.nodeValue, nodeType);
+        }
+        return _vnode;
+      }
+
+      function parseVNode(vnode) {
+        // 创建真实DOM
+        let type = vnode.type;
+        let _node = null;
+        if (type === 3) {
+          return document.createTextNode(vnode.value); // 创文本节点
+        } else if (type === 1) {
+          _node = document.createElement(vnode.tag);
+
+          // 属性
+          let data = vnode.data; // 现在这个data是键值对
+          Object.keys(data).forEach((key) => {
+            let attrName = key;
+            let attrValue = data[key];
+            _node.setAttribute(attrName, attrValue);
+          });
+          // 子元素
+          let children = vnode.children;
+          children.forEach((subvnode) => {
+            _node.appendChild(parseVNode(subvnode));
+          });
+          return _node;
+        }
+      }
+
+      let reg = /\{\{(.+?)\}\}/g;
+      /*根据路径访问对象成员*/
+      function getValueByPath(obj, path) {
+        let paths = path.split("."); //[xxx,yyy]
+        let res = obj;
+        for (let i = 0; i < paths.length; i++) {
+          let prop = paths[i];
+          res = res[prop];
+        }
+        return res;
+      }
+      /*
+       * 虚拟DOM构造函数
+       * */
+
+      /*将带有坑的vnode与数据data结合，得到填充数据的vnode*/
+      function combine(vnode, data) {
+        let _type = vnode.type;
+        let _data = vnode.data;
+        let _value = vnode.value;
+        let _tag = vnode.tag;
+        let _children = vnode.children;
+
+        let _vnode = null;
+
+        if (_type === 3) {
+          // 文本节点
+          _value = _value.replace(reg, function (_, g) {
+            return getValueByPath(data, g.trim());
+          });
+          _vnode = new VNode(_tag, _data, _value, _type);
+        } else if (_type === 1) {
+          _vnode = new VNode(_tag, _data, _value, _type);
+          _children.forEach((_subvnode) =>
+            _vnode.appendChild(combine(_subvnode, data))
+          );
+        }
+        return _vnode;
+      }
+
+      function YVue(options) {
+        this._data = options.data;
+        let elm = document.querySelector(options.el); // vue是字符串，这里是DOM
+        this._template = elm;
+        this._parent = elm.parentNode;
+        this.mount();
+      }
+
+      YVue.prototype.mount = function () {
+        // 需要提供一个render方法:生成一个虚拟DOM
+        // 这个render方法就是带有缓存功能
+
+        this.render = this.createRenderFn();
+
+        this.mountComponent();
+      };
+
+      YVue.prototype.mountComponent = function () {
+        // 执行 mountComponent() 函数
+        let mount = () => {
+          // 这里是一个函数，函数的this默认是全局对象
+          this.update(this.render());
+        };
+        mount.call(this); // 本质应该交给watcher调用
+      };
+
+      /*
+       * 在真正的Vue中，使用了二次提交的设计结果
+       * 1. 在页面中的DOM和虚拟DOM是一一对应的关系
+       * 2. 先 有AST和数据生成VNode(新，render)
+       * 3. 将新的VNode和新的VNode比较，更新(update)
+       * */
+
+      // 这里是生成render函数，目的是缓存抽象语法树，我们使用虚拟DOM模拟
+      YVue.prototype.createRenderFn = function () {
+        let ast = getVNode(this._template);
+
+        // vue: 将 AST + data => VNode
+        // 我们： 带有坑的VNode + data => 含有数据的VNode
+        return function render() {
+          // 将带坑的VNode转化为真正的带数据的VNode
+          let _tmp = combine(ast, this._data);
+          return _tmp;
+        };
+      };
+
+      // 将虚拟DOM渲染到页面中： diff算法就在这里
+      YVue.prototype.update = function (vnode) {
+        // 简化，直接生成HTML DOM ，replaceChild 到页面中
+        // 父元素replaceChild
+        let realDOM = parseVNode(vnode);
+        this._parent.replaceChild(realDOM, document.querySelector("#root"));
+      };
+
+      let app = new YVue({
+        el: "#root",
+        data: {
+          name: "fdsafa",
+          firstname: "fasdfas",
+        },
+      });
+    </script>
+  </body>
+</html>

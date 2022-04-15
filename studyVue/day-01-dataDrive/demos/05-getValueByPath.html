@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Title</title>
+  </head>
+  <body>
+    <script>
+      // 这个函数是在vue编译模板时就生成了。函数柯里化
+      // 减少函数调用
+      function createGetValueByPath(path) {
+        let paths = path.split("."); //[xxx,yyy]
+        return function getValueByPath(obj) {
+          // 先取得obj的xxx
+          let res = obj;
+          for (let i = 0; i < paths.length; i++) {
+            let prop = paths[i];
+            res = res[prop];
+          }
+          return res;
+        };
+      }
+
+      let getValueByPath = createGetValueByPath("a.b.c");
+      let o = {
+        a: {
+          b: {
+            c: 4,
+          },
+        },
+      };
+      console.log(getValueByPath(o));
+    </script>
+  </body>
+</html>
